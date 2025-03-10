@@ -4,9 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const ProfileScreen = () => {
   // State for handling the profile information
-  const [name, setName] = useState('John Doe');
-  const [email, setEmail] = useState('johndoe@example.com');
-  const [password, setPassword] = useState('password123');
+  const [name, setName] = useState('foo bar');
+  const [email, setEmail] = useState('foo@gmail.com');
+  const [password, setPassword] = useState('bar');
 
   // Form submission handler
   const onSave = () => {
