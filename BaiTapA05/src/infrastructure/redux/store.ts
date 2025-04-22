@@ -40,16 +40,10 @@ const persistConfig: PersistConfig<ReturnType<typeof reducers>> = {
    whitelist: ['auth', 'search'], // Only persist auth and search slices
 };
 
-/**
- * This function is used to get enhancers for debugging (not setup yet, but can be used in future so ignoring for now)
- */
 const getEnhancers = (getDefaultEnhancers: any) => {
    return getDefaultEnhancers();
 };
 
-/**
- * On api error this will be called
- */
 export const rtkQueryLoggerMiddleware =
    (api: any) => (next: any) => (action: any) => {
       if (isRejectedWithValue(action)) {
@@ -88,7 +82,6 @@ export const reduxStore = configureStore({
    enhancers: getEnhancers,
 });
 
-// Enable refetchOnMount and refetchOnReconnect behavior
 setupListeners(reduxStore.dispatch);
 
 export default reduxStore;

@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import ProductLayout from '~/components/layouts/product.layout';
 import ProductItem from '@components/ui/product-item';
 import { router } from 'expo-router';
@@ -8,20 +8,54 @@ import { logger } from 'react-native-logs';
 import { ProductItemType } from '~/src/infrastructure/types/product.type';
 import LoadingOverlay from '@components/ui/LoadingOverlay';
 import IoniIcons from 'react-native-vector-icons/Ionicons';
+// import AppDropdown, { DropdownItem } from '@components/ui/AppDropdown';
+import AppFilter, { DropdownFilterParams } from '@components/ui/AppFilter';
+import AppFilterVariants, {
+   DropdownFilterVariants,
+} from '@components/ui/AppFilterVariants';
+import { PaginationType } from '~/src/infrastructure/types/base-response.type';
+import { useAppSelector } from '~/src/infrastructure/redux/store';
 import AppDropdown from '@components/ui/AppDropdown';
+import { useDispatch } from 'react-redux';
+// import { addHistory } from '~/src/infrastructure/redux/features/app/history.slice';
 
 var log = logger.createLogger();
 
-const dropdownItems = [
+const FilterVariants: DropdownFilterVariants[] = [
    {
-      id: '1',
-      content: <Text style={{ color: '#1f2937' }}>New</Text>,
-      onPress: () => console.log('Selected Option 1'),
+      name: 'brand',
+      variantValues: ['prada', 'chanel', 'gucci', 'louis vuitton'],
    },
    {
-      id: '2',
-      content: <Text style={{ color: '#1f2937' }}>Sales</Text>,
-      onPress: () => console.log('Selected Option 2'),
+      name: 'gender',
+      variantValues: ['woman', 'man', 'unisex'],
+   },
+   {
+      name: 'sizes',
+      variantValues: ['S', 'M', 'L', 'XL'],
+   },
+   {
+      name: 'colors',
+      variantValues: ['WHITE', 'YELLOW', 'GREEN'],
+   },
+];
+
+const filterQueryParams: DropdownFilterParams[] = [
+   {
+      name: 'brand',
+      queryParam: '_product_brand',
+   },
+   {
+      name: 'gender',
+      queryParam: '_product_gender',
+   },
+   {
+      name: 'sizes',
+      queryParam: '_product_sizes',
+   },
+   {
+      name: 'colors',
+      queryParam: '_product_colors',
    },
 ];
 
@@ -29,7 +63,16 @@ const ProductScreen = () => {
    const [productsData, setProductsData] = useState<ProductItemType[]>([]);
    const [page, setPage] = useState(1);
    const [limit, setLimit] = useState(4);
-   const [totalItems, setTotalItems] = useState<number | null>(null); // Store totalItems from meta
+   const [filters, setFilters] = useState<Partial<PaginationType>>({});
+   const [totalItems, setTotalItems] = useState<number | null>(null);
+
+   const [queryParam, setQueryParam] = useState<DropdownFilterParams | null>(
+      null,
+   );
+   const [selectedFilterVariant, setSelectedFilterVariant] =
+      useState<DropdownFilterVariants | null>(null);
+
+   const searchQuery = useAppSelector((state) => state.search.query);
 
    const {
       data: productsResponse,
@@ -37,18 +80,42 @@ const ProductScreen = () => {
       isFetching,
       isError,
       refetch,
-   } = useGetProductsAsyncQuery({ _page: page, _limit: limit });
+   } = useGetProductsAsyncQuery({
+      _page: page,
+      _limit: limit,
+      _q: searchQuery ?? '',
+      ...filters,
+   });
 
-   useEffect(() => {
+   console.log(filters);
+
+   React.useEffect(() => {
       if (productsResponse?.data?.items) {
-         // Append new items to existing products
-         setProductsData((prev) => [...prev, ...productsResponse.data.items]);
-         // Set totalItems from meta on first load or when it changes
+         if (page === 1) {
+            // Reset data on new sort/filter
+            setProductsData(productsResponse.data.items);
+         } else {
+            // Append for pagination
+            setProductsData((prev) => {
+               const data = Array<ProductItemType>();
+
+               new Map(
+                  [...prev, ...productsResponse.data.items].map((item) => [
+                     item._id,
+                     item,
+                  ]),
+               ).forEach((value) => {
+                  data.push(value);
+               });
+
+               return data;
+            });
+         }
          if (productsResponse.data.meta?.totalItems !== undefined) {
             setTotalItems(productsResponse.data.meta.totalItems);
          }
       }
-   }, [productsResponse]);
+   }, [productsResponse, page]);
 
    // Handle loading more products when scrolling near the end
    const loadMoreProducts = useCallback(() => {
@@ -58,18 +125,15 @@ const ProductScreen = () => {
          totalItems !== null &&
          productsData.length < totalItems
       ) {
-         setPage((prev:any) => prev + 1); // Increment page to fetch next set
+         setPage((prev) => prev + 1);
       }
    }, [isFetching, isError, totalItems, productsData.length]);
 
-   // Handle scroll event to detect end of content
    const handleScroll = useCallback(
       (event: any) => {
          const { layoutMeasurement, contentOffset, contentSize } =
             event.nativeEvent;
-         const paddingToBottom = 20; // Trigger slightly before the very end
-
-         // Check if scrolled to the bottom
+         const paddingToBottom = 20;
          if (
             layoutMeasurement.height + contentOffset.y >=
             contentSize.height - paddingToBottom
@@ -80,51 +144,121 @@ const ProductScreen = () => {
       [loadMoreProducts],
    );
 
-   
+   const handleQueryParamsSelect = (item: DropdownFilterParams | null) => {
+      const variant = FilterVariants.find(
+         (variant) => variant.name === item?.name,
+      );
+
+      setSelectedFilterVariant(variant || null);
+      setQueryParam(item);
+
+      console.log('Query param:', item);
+      console.log('Query filter variant:', variant);
+
+      if (item && variant) {
+         const newFilters = {
+            ...filters,
+            [item.queryParam]: variant?.variantValues[0], // e.g., _product_brand: "Gucci"
+         };
+
+         setFilters(newFilters);
+         setPage(1); // Reset to first page
+         // setProductsData([]); // Clear current data
+         refetch(); // Fetch with new filters
+      } else {
+         // Clear filter if no variant is selected
+         setFilters({});
+         setPage(1);
+         // setProductsData([]);
+         refetch();
+      }
+   };
+
+   // Handle filter variant selection (e.g., "Gucci" or "Woman")
+   const handleQueryVariantSelect = (variantValue: string | null) => {
+      console.log('queryParam:', queryParam);
+      console.log('selectedFilterVariant:', variantValue);
+
+      if (queryParam && variantValue) {
+         const newFilters = {
+            ...filters,
+            [queryParam.queryParam]: variantValue, // e.g., _product_brand: "Gucci"
+         };
+
+         setFilters(newFilters);
+         setPage(1); // Reset to first page
+         // setProductsData([]); // Clear current data
+         refetch(); // Fetch with new filters
+      } else {
+         // Clear filter if no variant is selected
+         setFilters({});
+         setPage(1);
+         // setProductsData([]);
+         refetch();
+      }
+   };
+   // Handle add history and navigation
+   const dispatch = useDispatch();
+   const handleAddAndNavigate = (item: ProductItemType) => {
+      // dispatch(addHistory({
+      //    id:item._id,
+      //    product_img:item.product_imgs[0].secure_url,
+      //    product_name:item.product_name,
+      //    product_slug:item.product_slug,
+      // }))
+      router.push(`/products/${item.product_slug}`);
+   };
 
    return (
       <ProductLayout onScroll={handleScroll}>
          <View className="flex flex-row items-center justify-between px-6 py-5">
             <View>
                <Text className="text-base uppercase font-TenorSans-Regular">
-                  {totalItems !== null
-                     ? `${totalItems} Result of Dress`
-                     : 'Loading...'}
+                  {totalItems !== null ? `${totalItems} Results` : 'Loading...'}
                </Text>
             </View>
-            <View className="flex flex-row gap-2">
-               <View className="w-[80px]">
-                  <AppDropdown
-                     items={dropdownItems}
-                     placeholder="New"
-                     containerStyles="rounded-full"
-                     TextStyles="text-base"
-                     iconSize={20}
+            <View className="flex flex-row items-center justify-center gap-4">
+               <View className="">
+                  <AppFilterVariants
+                     queryParam={queryParam}
+                     variants={selectedFilterVariant}
+                     onSelected={handleQueryVariantSelect}
+                     containerStyles="w-[150px]"
                   />
                </View>
-               <TouchableOpacity className="p-3 w-[42px] bg-[#F9F9F9] rounded-full">
-                  <IoniIcons name="list-outline" size={22} color="#83838F" />
-               </TouchableOpacity>
-               <TouchableOpacity className="p-3 w-[42px] bg-[#F9F9F9] rounded-full">
-                  <IoniIcons name="filter-outline" size={22} color="#DD8560" />
-               </TouchableOpacity>
+
+               <View className="">
+                  <AppFilter
+                     items={filterQueryParams}
+                     icon={
+                        <IoniIcons
+                           name="filter-outline"
+                           size={22}
+                           color="#DD8560"
+                        />
+                     }
+                     onSelected={handleQueryParamsSelect}
+                  />
+               </View>
             </View>
          </View>
 
          <View>
-            <View className="flex-row flex-wrap items-center justify-center gap-6">
+            <View className="flex flex-row flex-wrap items-center justify-center gap-6">
                {productsData.map((item, index) => (
                   <TouchableOpacity
                      key={index}
-                     onPress={() => {
-                        router.push('/products/lamerei');
-                     }}
+                     onPress={() => handleAddAndNavigate(item)}
                   >
                      <ProductItem
-                        title="lamerei"
+                        id={item._id}
+                        title={item.product_name}
                         description="reversible angora cardigan"
-                        price={120}
-                        imageUrl="https://res.cloudinary.com/djiju7xcq/image/upload/v1729839380/Sunflower-Jumpsuit-1-690x875_dibawa.webp"
+                        price={item.product_price}
+                        imageUrl={item.product_imgs[0].secure_url}
+                        slug={item.product_slug}
+                        category={item.product_category.category_name}
+                        brand={item.product_brand}
                      />
                   </TouchableOpacity>
                ))}
