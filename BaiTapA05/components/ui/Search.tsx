@@ -23,7 +23,7 @@ const Search = () => {
       refetch,
     } = useGetProductsAsyncQuery({
       _page: 1,
-      _limit: 4,
+      _limit: 10,
       _q: searchQuery ?? "",
       // ...filters,
     });

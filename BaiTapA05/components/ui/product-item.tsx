@@ -1,15 +1,25 @@
-import { View, Text, Image } from 'react-native';
-import React from 'react';
 import FeatherIcon from 'react-native-vector-icons/Feather';
+import { ProductItemType } from '~/src/infrastructure/types/product.type';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import FontAwesomeIcon from 'react-native-vector-icons/FontAwesome';
+import { useDispatch } from 'react-redux';
+import { useAppSelector } from '~/src/infrastructure/redux/store';
 
 type ProductItemProps = {
-   title?: string;
+   id: string;
+   title: string;
    description?: string;
-   price?: number;
-   imageUrl?: string;
+   price: number;
+   imageUrl: string;
+   slug: string;
+   category: string;
+   brand: string;
 };
 
 const ProductItem = (props: ProductItemProps) => {
+   const dispatch = useDispatch();
+
    return (
       <View>
          <View className="relative">
@@ -17,18 +27,21 @@ const ProductItem = (props: ProductItemProps) => {
                source={{
                   uri: props.imageUrl,
                }}
-               style={{ width: 165, height: 240 }}
+               style={{ width: '100%', height: 240 }}
+               resizeMode="cover"
             />
 
-            <FeatherIcon
-               name="heart"
-               size={20}
-               color="#DD855F"
-               className="absolute bottom-2 right-2 "
-            />
+            <TouchableOpacity>
+               <FontAwesomeIcon
+                  name="heart-o"
+                  size={20}
+                  color="#DD855F"
+                  className="absolute bottom-2 right-2 "
+               />
+            </TouchableOpacity>
          </View>
          <View className="px-1 mt-1">
-            <Text className="text-lg font-TenorSans-Regular">
+            <Text className="text-base font-TenorSans-Regular">
                {props.title}
             </Text>
             <Text className="text-sm font-TenorSans-Regular">
